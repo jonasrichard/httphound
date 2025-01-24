@@ -1,0 +1,12 @@
+[package]
+name = "httphound"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytes = "1.9.0"
+chrono = "0.4.39"
+etherparse = "0.17.0"
+flate2 = "1.0.35"
+httparse = "1.9.5"
+pcap = "2.2.0"
