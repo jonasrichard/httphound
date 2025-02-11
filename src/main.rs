@@ -3,10 +3,20 @@ mod stream;
 
 use std::{io, os::fd::AsRawFd};
 
+use clap::{command, Parser};
 use pcap::Capture;
 use stream::MyPacket;
 
+#[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
+pub struct Args {
+    /// Pattern of path to match
+    #[arg(short, long)]
+    pub path: Option<String>,
+}
+
 fn main() {
+    let args = Args::parse();
     let mut capture =
         unsafe { Capture::from_raw_fd(io::stdin().as_raw_fd()).expect("Cannot open stdin") };
 
@@ -32,12 +42,13 @@ fn main() {
 
             if let Some((id, complete)) = store.append_packet(enriched) {
                 if complete {
-                    match store.streams.get(&id) {
+                    match store.streams.get_mut(&id) {
                         Some(stream) => match stream.parse() {
-                            Ok((req, resp)) => {
-                                println!("------\nRequest:");
-                                println!("{:?}", req);
-                                println!("{:?}", resp);
+                            Ok(_) => {
+                                if stream.is_matching(&args) {
+                                    stream.print();
+                                }
+                                // TODO remove stream to save memory
                             }
                             Err(e) => {
                                 eprintln!("Parse error: {e}");

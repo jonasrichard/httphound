@@ -2,10 +2,12 @@ use std::{collections::HashMap, net::IpAddr};
 
 use bytes::BytesMut;
 use etherparse::{InternetSlice, SlicedPacket, TransportSlice};
-use httparse::{Request, Response};
 use pcap::PacketHeader;
 
-use crate::http::{self, Req, Resp};
+use crate::{
+    http::{self, Req, Resp},
+    Args,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Endpoint {
@@ -173,16 +175,66 @@ impl HttpStream {
         buf
     }
 
-    pub fn parse(&self) -> Result<(Req, Resp), Box<dyn std::error::Error>> {
-        let mut req_buf = self.collect_request();
-        println!("{:?}", req_buf);
-        let req = http::parse_request(&mut req_buf)?;
+    pub fn parse(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.request = Some(http::parse_request(&mut self.collect_request())?);
+        self.response = Some(http::parse_response(&mut self.collect_response())?);
 
-        println!("{:?}", req);
+        Ok(())
+    }
 
-        let resp = http::parse_response(&mut self.collect_response())?;
+    pub fn is_matching(&self, args: &Args) -> bool {
+        if let Some(ref req) = self.request {
+            if let Some(ref path_match) = args.path {
+                if req.path.contains(path_match) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+        }
 
-        Ok((req, resp))
+        false
+    }
+
+    pub fn print(&self) {
+        println!("--- HTTP request/response ---");
+
+        if let Some(ref req) = self.request {
+            println!("HTTP 1.{} {} {}", req.version, req.method, req.path);
+
+            for (header_name, header_value) in &req.headers {
+                println!("{}: {}", header_name, header_value);
+            }
+
+            if let Some(ref req_body) = req.body {
+                println!("{}\n", req_body);
+            }
+
+            println!();
+        }
+
+        if let Some(ref resp) = self.response {
+            print!("HTTP 1.{} {}", resp.version, resp.code);
+
+            match &resp.reason {
+                Some(r) => {
+                    println!(" ({})", r);
+                }
+                None => {
+                    println!();
+                }
+            }
+
+            for (header_name, header_value) in &resp.headers {
+                println!("{}: {}", header_name, header_value);
+            }
+
+            if let Some(ref resp_body) = resp.body {
+                println!("{}\n", resp_body);
+            }
+
+            println!();
+        }
     }
 }
 
